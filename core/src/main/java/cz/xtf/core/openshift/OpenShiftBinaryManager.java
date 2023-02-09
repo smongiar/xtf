@@ -2,6 +2,8 @@ package cz.xtf.core.openshift;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.DirectoryStream;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -56,9 +58,22 @@ class OpenShiftBinaryManager {
         } else {
             // If we are using an existing kubeconfig (or a default kubeconfig), we copy the original kubeconfig
             if (StringUtils.isNotEmpty(kubeconfig)) {
-                // We copy the specified kubeconfig
+                // We copy the specified kubeconfig and all relative keys/certificates
                 try {
-                    Files.copy(Paths.get(kubeconfig), Paths.get(ocConfigPath), StandardCopyOption.REPLACE_EXISTING);
+                    DirectoryStream<Path> files = Files
+                            .newDirectoryStream(FileSystems.getDefault().getPath(Paths.get(kubeconfig).getParent().toString()));
+                    Path targetDir = Paths.get(ocConfigPath).getParent();
+                    for (Path f : files) {
+                        String targetPath = targetDir + System.getProperty("file.separator") + f.getFileName();
+                        File target = new File(targetPath);
+                        if (!target.exists()) {
+                            Files.copy(f, Paths.get(targetDir.toString()).resolve(f.getFileName()));
+                        }
+                    }
+                    if (!Paths.get(ocConfigPath).toFile().exists()) {
+                        Files.copy(Paths.get(kubeconfig), Paths.get(ocConfigPath), StandardCopyOption.REPLACE_EXISTING);
+                    }
+
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
